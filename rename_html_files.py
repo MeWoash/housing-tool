@@ -1,11 +1,15 @@
-from pathlib import Path
-from web_scraper.utils import get_offer_id_from_file
-from loguru import logger
+import asyncio
 import os
+from pathlib import Path
 
+from loguru import logger
+
+from web_scraper.utils import OfferID, get_offer_id_from_file
+import aiofiles
 
 SCRAPED_DIR = Path("scraped_data")
 SOURCE = "OTO"
+
 
 def file_exists_case_sensitive(path: str) -> bool:
     dir_path = os.path.dirname(path)
@@ -15,18 +19,25 @@ def file_exists_case_sensitive(path: str) -> bool:
     except FileNotFoundError:
         return False
 
-def safe_rename_case_sensitive(src: str, dst: str) -> None:
+
+async def safe_rename_case_sensitive(src: Path, dst: Path) -> None:
     """
     Safely renames a file even if the only difference is letter casing (Windows safe).
     Copies content from src to dst and deletes src.
     """
-    with open(src, "rb") as f_src:
-        content = f_src.read()
-    with open(dst, "wb") as f_dst:
-        _ = f_dst.write(content)
+    async with aiofiles.open(src, "rb") as f_src:
+        content = await f_src.read()
+    async with aiofiles.open(dst, "wb") as f_dst:
+        bytes = await f_dst.write(content)
+        logger.debug(f"Bytes copied: {bytes}")
     os.remove(src)
 
-def main() -> None:
+
+def get_file_name(offer_id: OfferID) -> str:
+    return f"{offer_id}.html"
+
+
+async def main() -> None:
     renamed = 0
     skipped = 0
 
@@ -43,23 +54,26 @@ def main() -> None:
             skipped += 1
             continue
 
-        new_filename = f"{offer_id}.html"
+        new_filename = get_file_name(offer_id)
         new_path = SCRAPED_DIR / new_filename
 
         if file_exists_case_sensitive(str(new_path)):
-            logger.warning(f"Target file already exists (case-sensitive match): {new_filename} (skipping)")
+            logger.warning(
+                f"Target file already exists (case-sensitive match): {new_filename} (skipping)"
+            )
             skipped += 1
             continue
 
         try:
-            safe_rename_case_sensitive(str(file_path), str(new_path))
+            await safe_rename_case_sensitive(file_path, new_path)
             logger.info(f"Renamed {file_path.name} ➜ {new_filename}")
             renamed += 1
         except Exception as e:
             logger.error(f"Failed to rename {file_path.name}: {e}")
             skipped += 1
 
-    logger.info(f"Renaming complete. Files renamed: {renamed}, skipped: {skipped}")
+    logger.success(f"Renaming complete. Files renamed: {renamed}, skipped: {skipped}")
+
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
