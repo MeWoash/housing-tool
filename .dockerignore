@@ -1,0 +1,17 @@
+data/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite
+*.log
+*.egg-info/
+*.egg
+*.whl
+*.tar.gz
+*.zip
+*.tar
+*.gz
+data/
