@@ -1,14 +1,11 @@
 import os
 import re
 
-from annotated_types import Len
 from parsel import Selector
 from loguru import logger
 import json
 
 from db.models import Offer
-from db.database import get_session
-from sqlmodel import Session
 
 SCRAPED_DIR: str = "scraped_data"
 SOURCE: str = "otodom"
