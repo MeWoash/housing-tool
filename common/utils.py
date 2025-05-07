@@ -1,10 +1,10 @@
-from typing import Any
 from common.classes import OfferID, Url, DocContent
 import aiofiles
 from pathlib import Path
 import re
 from parsel import Selector
 from loguru import logger
+
 
 def get_offer_id_from_url(prefix: str, canonical_url: Url) -> OfferID | None:
     match = re.search(r"ID[\w\d]+", canonical_url)
@@ -29,17 +29,6 @@ def get_offer_id_from_file(prefix: str, file_path: Path) -> OfferID | None:
 
     return get_offer_id_from_url(prefix, canonical_url)
 
-def divide_into_batches(list: list[Any], n_batches: int) -> list[list[Any]]:
-    """Divides a list into n_batches of approximately equal size."""
-    assert n_batches > 0 and n_batches <= len(list), "Invalid number of batches."
-    batch_size = (len(list) + n_batches - 1) // n_batches
-    batches = [list[i:i + batch_size] for i in range(0, len(list), batch_size)]
-    logger.info(f"Divided {len(list)} elements into {len(batches)} batches with sizes {[len(batch) for batch in batches]}")
-    return batches
-
-def batch_list(data: list[Any], size: int):
-    for i in range(0, len(data), size):
-        yield data[i:i + size]
 
 async def write_file(
     path: Path,
@@ -51,5 +40,5 @@ async def write_file(
 
 
 async def read_file(path: Path) -> DocContent:
-    async with aiofiles.open(path, 'r', encoding="utf-8") as file:
+    async with aiofiles.open(path, "r", encoding="utf-8") as file:
         return DocContent(await file.read())
