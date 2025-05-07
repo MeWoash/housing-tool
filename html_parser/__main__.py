@@ -4,7 +4,7 @@ from common.time_manager import timeit
 # from web_scraper import web_scraper
 
 @timeit
-async def html_parser_main():
-    await parse()
+def html_parser_main():
+    parse()
 
-asyncio.run(html_parser_main())
+html_parser_main()

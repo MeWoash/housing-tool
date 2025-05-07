@@ -39,5 +39,5 @@ async def write_file(
 
 
 async def read_file(path: Path) -> DocContent:
-    async with aiofiles.open(path, 'r') as file:
+    async with aiofiles.open(path, 'r', encoding="utf-8") as file:
         return DocContent(await file.read())
