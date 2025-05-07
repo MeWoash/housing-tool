@@ -1,10 +1,9 @@
 import asyncio
 import os
 from pathlib import Path
-
 from loguru import logger
-
-from web_scraper.utils import OfferID, get_offer_id_from_file
+from common.classes import OfferID
+from common.utils import get_offer_id_from_file
 import aiofiles
 
 SCRAPED_DIR = Path("scraped_data")

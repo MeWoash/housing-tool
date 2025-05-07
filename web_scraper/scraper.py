@@ -7,7 +7,8 @@ from parsel import Selector
 from pathlib import Path
 import aiofiles
 import random
-from web_scraper.utils import DocContent, Url, get_offer_id_from_url
+from common.classes import Url, DocContent
+from common.utils import get_offer_id_from_url, write_file
 
 HTTPX_CLIENT = httpx.AsyncClient()
 
@@ -38,13 +39,7 @@ def get_page_path(url: Url) -> Path:
     return path
 
 
-async def save_page(
-    path: Path,
-    content: DocContent,
-) -> None:
-    async with aiofiles.open(path, "w", encoding="utf-8") as file:
-        bytes_saved = await file.write(content)
-        logger.info(f"Bytes saved: {bytes_saved}")
+
 
 
 async def get_offers_from_page(page_number: int) -> list[Url]:
@@ -102,7 +97,7 @@ async def scrape() -> None:
                 except Exception:
                     logger.exception(f"Failed to download {url}")
                     continue
-                await save_page(path, doc_content)
+                await write_file(path, doc_content)
                 sleep = random.uniform(8, 12)
                 logger.info(f"Delay after offer for {sleep} seconds...")
                 await asyncio.sleep(sleep)

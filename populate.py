@@ -4,7 +4,8 @@ import re
 from parsel import Selector
 from loguru import logger
 import json
-
+from common.utils import get_offer_id_from_url
+from common.classes import Url
 from db.models import Offer
 
 SCRAPED_DIR: str = "scraped_data"
@@ -14,20 +15,15 @@ def get_first(sel: Selector, xpath: str) -> str | None:
     result = sel.xpath(xpath).get()
     return result.strip() if result else None
 
-def extract_offer_id(canonical_url: str | None) -> str | None:
-    if not canonical_url:
-        return None
-    match = re.search(r'ID[\w\d]+', canonical_url)
-    return f"{SOURCE}_{match.group(0)}" if match else None
+
 
 def parse_offer(file_path: str) -> Offer | None:
     with open(file_path, "r", encoding="utf-8") as f:
         content: str = f.read()
 
     sel = Selector(text=content)
-
     canonical: str | None = get_first(sel, '//link[@rel="canonical"]/@href')
-    offer_id: str | None = extract_offer_id(canonical)
+    offer_id: str | None = get_offer_id_from_url("OTO", Url(canonical))
 
     if not offer_id:
         print(f"Brak ID w {file_path}")
