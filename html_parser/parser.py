@@ -1,19 +1,14 @@
 import asyncio
 from pathlib import Path
-from multiprocessing import Pool
 import os
-from typing import Any
 from loguru import logger
 from common.classes import Url, DocContent
 from parsel import Selector
 
-from html_parser.env import ASYNCIO_BATCH_SIZE, SCRAPED_DATA_DIR, POOL_SIZE
-from common.utils import read_file, get_offer_id_from_url, divide_into_batches
+from html_parser.env import BATCH_SIZE, POOL, SCRAPED_DATA_DIR
+from common.utils import read_file, get_offer_id_from_url
 from db.models import Offer
-
-def batch_list(data: list[Any], size: int):
-    for i in range(0, len(data), size):
-        yield data[i:i + size]
+from common.fast_process import fast_multi_process
 
 async def parse_offer(content: DocContent) -> Offer | None:
     
@@ -66,27 +61,16 @@ async def parse_file(file_path: Path) -> None:
     content = await read_file(file_path)
     offer = await parse_offer(content)
     # logger.info(f"Worker: {os.getpid()} Parsed offer: {offer}")
-
-async def parse_worker(batch: list[str]) -> None:
-    """Worker function to parse a batch of files."""
-    file_paths: list[Path] = [Path(os.path.join(SCRAPED_DATA_DIR, file)) for file in batch]
-        
-    for async_batch in batch_list(file_paths, ASYNCIO_BATCH_SIZE):
-        tasks = [asyncio.create_task(parse_file(Path(file_path))) for file_path in async_batch]
-        results = await asyncio.gather(*tasks) # type: ignore
-
-def run_parse_worker_async(batch: list[str]) -> None:
-    return asyncio.run(parse_worker(batch))
-
+    
+    
 def parse():
     files_in_dir = os.listdir(SCRAPED_DATA_DIR)
-    files_to_parse = [file for file in files_in_dir if file.endswith('.html')][:1000]
+    files = [file for file in files_in_dir if file.endswith('.html')][:1000]
     
-    if POOL_SIZE <= 1:
-        logger.info(f"Running in single process, {ASYNCIO_BATCH_SIZE} batch async mode")
-        results = run_parse_worker_async(files_to_parse) # type: ignore
-    else:
-        logger.info(f"Running in multiprocessing({POOL_SIZE} workers), {ASYNCIO_BATCH_SIZE} batch async mode")
-        batches = divide_into_batches(files_to_parse, POOL_SIZE)
-        with Pool(POOL_SIZE) as pool:
-            results = pool.map(run_parse_worker_async, batches) # type: ignore
+    filepaths_to_parse: list[Path] = [Path(os.path.join(SCRAPED_DATA_DIR, file)) for file in files]
+    fast_multi_process(
+        data=filepaths_to_parse,
+        process_fnc=parse_file,
+        n_processes=POOL,
+        n_async_batch=BATCH_SIZE,
+    )

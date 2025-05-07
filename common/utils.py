@@ -37,6 +37,10 @@ def divide_into_batches(list: list[Any], n_batches: int) -> list[list[Any]]:
     logger.info(f"Divided {len(list)} elements into {len(batches)} batches with sizes {[len(batch) for batch in batches]}")
     return batches
 
+def batch_list(data: list[Any], size: int):
+    for i in range(0, len(data), size):
+        yield data[i:i + size]
+
 async def write_file(
     path: Path,
     content: DocContent,
