@@ -1,51 +1,50 @@
 import asyncio
 import inspect
-from pathlib import Path
 from multiprocessing import Pool
-import os
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Awaitable, TypeAlias
 from loguru import logger
 from common.utils import divide_into_batches, batch_list
+import os
 
-async def __async_worker(args: tuple[list[Any], Callable[..., Any], int]) -> None:
+Pfnc: TypeAlias = Callable[..., Any]
+
+async def async_process_data(data: list[Any], process_fnc: Pfnc, n_batches: int) -> None:
     """Async worker function to parse a batch of files."""
-    data, process_fnc, n_batches = args
     for async_batch in batch_list(data, n_batches):
         tasks = [asyncio.create_task(process_fnc(batch_element)) for batch_element in async_batch]
-        results = await asyncio.gather(*tasks) # type: ignore
-        
-def __sync_worker(args: tuple[list[Any], Callable[..., Any], int]) -> None:
+        results = await asyncio.gather(*tasks)  # type: ignore
+
+def process_data(data: list[Any], process_fnc: Pfnc, n_batches: int) -> None:
     """Sync worker function to parse a batch of files."""
-    data, process_fnc, n_batches = args # type: ignore
     for element in data:
         process_fnc(element)
 
-def __run_worker(args: tuple[list[Any], Callable[..., Any], int]) -> None:
+def __run_worker(data: list[Any], process_fnc: Pfnc, n_batches: int) -> None:
     """Run the worker function based on the type of process function."""
-    if inspect.iscoroutinefunction(args[1]):
-        logger.info(f"Running in async mode with {args[2]} batches")
-        return asyncio.run(__async_worker(args))
+    if inspect.iscoroutinefunction(process_fnc):
+        logger.info(f"PID: {os.getpid()} running in async mode with {n_batches} batches")
+        return asyncio.run(async_process_data(data, process_fnc, n_batches))
     else:
-        logger.info(f"Running in sync mode")
-        return __sync_worker(args)
+        logger.info(f"PID: {os.getpid()} running in sync mode")
+        return process_data(data, process_fnc, n_batches)
 
 def fast_multi_process(
     data: list[Any],
-    process_fnc: Callable[..., Any],
+    process_fnc: Pfnc,
     n_processes: int = 1,
-    n_async_batch:int = 1
-    ) -> None:
+    n_async_batch: int = 1
+) -> None:
     """
-    Function dispatches work over a pool of processes and handles asynchronous batches defined by n_async_batch.
+    Function dispatches work over a pool of processes and handles asynchronous batches.
     This design improves throughput by leveraging parallel execution and asynchronous batch processing.
     """
     
     if n_processes <= 1:
-        logger.info(f"Running in single process")
-        results = __run_worker((data, process_fnc, n_async_batch)) # type: ignore
+        logger.info("Running in single process")
+        __run_worker(data, process_fnc, n_async_batch)  # CHANGED
     else:
-        logger.info(f"Running in multiprocessing({n_processes} workers)")
+        logger.info(f"Running in multiprocessing ({n_processes} workers)")
         batches = divide_into_batches(data, n_processes)
-        args = zip(batches, [process_fnc]*len(batches), [n_async_batch]*len(batches))
+        args = list(zip(batches, [process_fnc] * len(batches), [n_async_batch] * len(batches)))
         with Pool(n_processes) as pool:
-            results = pool.map(__run_worker, args) # type: ignore
+            pool.starmap(__run_worker, args) # type: ignore
