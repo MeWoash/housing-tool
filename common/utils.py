@@ -1,21 +1,9 @@
-from loguru import logger
+from common.classes import OfferID, Url, DocContent
+import aiofiles
 from pathlib import Path
-from parsel import Selector
 import re
-import hashlib
-
-
-class DocContent(str):
-    pass
-
-
-class Url(str):
-    def hash(self) -> str:
-        return hashlib.md5(self.encode()).hexdigest()[:8].lower()
-
-
-class OfferID(str):
-    pass
+from parsel import Selector
+from loguru import logger
 
 
 def get_offer_id_from_url(prefix: str, canonical_url: Url) -> OfferID | None:
@@ -40,3 +28,17 @@ def get_offer_id_from_file(prefix: str, file_path: Path) -> OfferID | None:
         return None
 
     return get_offer_id_from_url(prefix, canonical_url)
+
+
+async def write_file(
+    path: Path,
+    content: DocContent,
+) -> None:
+    async with aiofiles.open(path, "w", encoding="utf-8") as file:
+        bytes_saved = await file.write(content)
+        logger.info(f"Bytes saved: {bytes_saved} to {path}")
+
+
+async def read_file(path: Path) -> DocContent:
+    async with aiofiles.open(path, "r", encoding="utf-8") as file:
+        return DocContent(await file.read())
