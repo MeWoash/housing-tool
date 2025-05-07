@@ -5,10 +5,7 @@ import os
 from typing import Any
 from loguru import logger
 from common.classes import Url, DocContent
-import re
 from parsel import Selector
-from loguru import logger
-import json
 
 from html_parser.env import ASYNCIO_BATCH_SIZE, SCRAPED_DATA_DIR, POOL_SIZE
 from common.utils import read_file, get_offer_id_from_url, divide_into_batches

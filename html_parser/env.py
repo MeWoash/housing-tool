@@ -11,4 +11,4 @@ SCRAPED_DATA_DIR = Path(os.getenv("SCRAPED_DATA_DIR", "./scraped_data"))
 
 # HTML_PARSER
 ASYNCIO_BATCH_SIZE = 2
-POOL_SIZE = 1
+POOL_SIZE = 4
