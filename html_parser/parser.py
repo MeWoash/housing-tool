@@ -1,8 +1,8 @@
 import asyncio
 from pathlib import Path
-from typing import Any
 from multiprocessing import Pool
 import os
+from typing import Any
 from loguru import logger
 from common.classes import Url, DocContent
 import re
@@ -10,11 +10,15 @@ from parsel import Selector
 from loguru import logger
 import json
 
-from html_parser.env import SCRAPED_DATA_DIR, POOL_SIZE
-from common.utils import read_file, get_offer_id_from_url
+from html_parser.env import ASYNCIO_BATCH_SIZE, SCRAPED_DATA_DIR, POOL_SIZE
+from common.utils import read_file, get_offer_id_from_url, divide_into_batches
 from db.models import Offer
 
-def parse_offer(content: DocContent) -> Offer | None:
+def batch_list(data: list[Any], size: int):
+    for i in range(0, len(data), size):
+        yield data[i:i + size]
+
+async def parse_offer(content: DocContent) -> Offer | None:
     
     sel = Selector(text=content)
     canonical: str | None = sel.xpath('//link[@rel="canonical"]/@href').get()
@@ -60,25 +64,19 @@ def parse_offer(content: DocContent) -> Offer | None:
     )
     return offer
 
-def divide_into_batches(list: list[Any], n_batches: int) -> list[list[Any]]:
-    """Divides a list into n_batches of approximately equal size."""
-    assert n_batches > 0 and n_batches <= len(list), "Invalid number of batches."
-    batch_size = (len(list) + n_batches - 1) // n_batches
-    batches = [list[i:i + batch_size] for i in range(0, len(list), batch_size)]
-    logger.info(f"Divided {len(list)} elements into {len(batches)} batches with sizes {[len(batch) for batch in batches]}")
-    return batches
-
 async def parse_file(file_path: Path) -> None:
     """Parse a single file."""
     content = await read_file(file_path)
-    offer = parse_offer(content)
+    offer = await parse_offer(content)
     # logger.info(f"Worker: {os.getpid()} Parsed offer: {offer}")
 
 async def parse_worker(batch: list[str]) -> None:
     """Worker function to parse a batch of files."""
-    for file in batch:
-        file_path = Path(os.path.join(SCRAPED_DATA_DIR, file))
-        await parse_file(file_path)
+    file_paths: list[Path] = [Path(os.path.join(SCRAPED_DATA_DIR, file)) for file in batch]
+        
+    for async_batch in batch_list(file_paths, ASYNCIO_BATCH_SIZE):
+        tasks = [asyncio.create_task(parse_file(Path(file_path))) for file_path in async_batch]
+        results = await asyncio.gather(*tasks) # type: ignore
 
 def run_parse_worker_async(batch: list[str]) -> None:
     return asyncio.run(parse_worker(batch))
@@ -88,10 +86,10 @@ def parse():
     files_to_parse = [file for file in files_in_dir if file.endswith('.html')][:1000]
     
     if POOL_SIZE <= 1:
-        logger.info("Running in async mode")
-        results = run_parse_worker_async(files_to_parse)
+        logger.info(f"Running in single process, {ASYNCIO_BATCH_SIZE} batch async mode")
+        results = run_parse_worker_async(files_to_parse) # type: ignore
     else:
-        logger.info(f"Running in multiprocessing mode with {POOL_SIZE} workers")
+        logger.info(f"Running in multiprocessing({POOL_SIZE} workers), {ASYNCIO_BATCH_SIZE} batch async mode")
         batches = divide_into_batches(files_to_parse, POOL_SIZE)
         with Pool(POOL_SIZE) as pool:
-            results = pool.map(run_parse_worker_async, batches)
+            results = pool.map(run_parse_worker_async, batches) # type: ignore

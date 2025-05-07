@@ -9,5 +9,6 @@ if not is_loaded:
 
 SCRAPED_DATA_DIR = Path(os.getenv("SCRAPED_DATA_DIR", "./scraped_data"))
 
-ASYNCIO_BATCH_SIZE = int(os.getenv("ASYNCIO_BATCH_SIZE", 5))
-POOL_SIZE = int(os.getenv("POOL_SIZE", 4))
+# HTML_PARSER
+ASYNCIO_BATCH_SIZE = 2
+POOL_SIZE = 1
