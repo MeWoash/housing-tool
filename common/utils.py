@@ -5,10 +5,15 @@ import re
 from parsel import Selector
 from loguru import logger
 
+def get_offer_id_from_path(file_path: Path) -> OfferID:
+    """
+    Extract the offer ID from the file name.
+    """
+    return OfferID(file_path.stem)
 
 def get_offer_id_from_url(prefix: str, canonical_url: Url) -> OfferID | None:
-    match = re.search(r"ID[\w\d]+", canonical_url)
-    return OfferID(f"{prefix}_{match.group(0)}") if match else None
+    match = re.search(r"ID([\w\d]+)", canonical_url)
+    return OfferID(f"{prefix}_{match.group(1)}") if match else None
 
 
 def get_offer_id_from_file(prefix: str, file_path: Path) -> OfferID | None:
