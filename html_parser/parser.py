@@ -1,13 +1,65 @@
+import asyncio
+import json
 from pathlib import Path
 import os
+import re
 from loguru import logger
 from common.classes import Url, DocContent
 from parsel import Selector
+import html
 
 from html_parser.env import BATCH_SIZE, POOL, SCRAPED_DATA_DIR
 from common.utils import read_file, get_offer_id_from_url
 from db.models import Offer
 from common.fast_process import fast_multi_process
+
+from typing import Mapping, TypeVar
+
+R = TypeVar("R")
+
+def get_safe_nested(
+    data: Mapping[str, object],
+    keys: list[str],
+    default: R
+) -> R:
+    """
+    Traverse nested dicts/lists using keys and return final value, or default of type T.
+    """
+    value = data
+    for key in keys:
+        if isinstance(value, dict):
+            value = value.get(key)
+        else:
+            return default
+        
+    if isinstance(value, type(default)):
+        return value
+    return default
+
+def extract_json_strings(text: str) -> list[str]:
+    json_strings = []
+    stack = []
+    start_indices = []
+
+    for i, char in enumerate(text):
+        if char == '{':
+            if not stack:
+                start_indices.append(i)
+            stack.append('{')
+        elif char == '}':
+            if stack:
+                stack.pop()
+                if not stack:
+                    start = start_indices.pop(0)
+                    candidate = text[start:i+1]
+                    # Validate if it's a valid JSON object
+                    try:
+                        json.loads(candidate)
+                        json_strings.append(candidate)
+                    except json.JSONDecodeError:
+                        pass  # Not a valid JSON, skip
+
+    return json_strings
 
 
 async def parse_offer(content: DocContent) -> Offer | None:
@@ -19,80 +71,62 @@ async def parse_offer(content: DocContent) -> Offer | None:
         logger.warning(f"Offer ID not found in {canonical}.")
         return None
 
-    main_content = sel.xpath('//div[@data-sentry-element="MainContent"]')
+    json_strings = extract_json_strings(content)
 
-    # match = re.search(r'"ad":(\{.+\})', content)
-    # if match:
-    #     json_string = match.group(1)
-    #     json_dict  = json.loads(json_string)
-    #     logger.info(json_dict)
+    json_data = None
+    for json_string in json_strings[:20]:  # sprawdzamy tylko pierwsze 20 dla wydajności
+        if '{"props":' in json_string:
+            try:
+                json_data = json.loads(json_string)
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to decode JSON string: {json_string}")
+            break
+    if json_data is None:
+        logger.warning(f"JSON data not found in {canonical}.")
+        return None
+    
+    ad = json_data["props"]["pageProps"]["ad"]
+    location = ad.get("location", {})
+    address = location.get("address", {})
+    coordinates = location.get("coordinates", {})
+    
+    characteristics_list = ad.get("characteristics", [])
+    characteristics = {item["key"]: item for item in characteristics_list if "key" in item and "value" in item}
 
     offer = Offer(
-        id=offer_id,
-        title=main_content.xpath('//h1[@data-sentry-element="Title"]/text()').get(),
-        price=main_content.xpath('//strong[@data-sentry-element="Price"]/text()').get(),
-        size=main_content.xpath('//div[@class="css-1ftqasz"]//text()').getall()[0],
-        rooms=main_content.xpath('//div[@class="css-1ftqasz"]//text()').getall()[1],
-        heating_type=main_content.xpath(
-            '//p[text()="Ogrzewanie"]/following-sibling::*[last()]//text()'
-        ).get(),
-        floor_number=main_content.xpath(
-            '//p[text()="Piętro"]/following-sibling::*[last()]//text()'
-        ).get(),
-        maintenance_cost=main_content.xpath(
-            '//p[text()="Czynsz"]/following-sibling::*[last()]//text()'
-        ).get(),
-        finishing_state=main_content.xpath(
-            '//p[text()="Stan wykończenia"]/following-sibling::*[last()]//text()'
-        ).get(),
-        market_type=main_content.xpath(
-            '//p[text()="Rynek"]/following-sibling::*[last()]//text()'
-        ).get(),
-        ownership_type=main_content.xpath(
-            '//p[text()="Forma własności"]/following-sibling::*[last()]//text()'
-        ).get(),
-        advertiser_type=main_content.xpath(
-            '//p[text()="Typ ogłoszeniodawcy"]/following-sibling::*[last()]//text()'
-        ).get(),
-        additional_info=", ".join(
-            main_content.xpath(
-                '//p[text()="Informacje dodatkowe"]/following-sibling::*[last()]//span/text()'
-            ).getall()
-        ),
-        construction_year=main_content.xpath(
-            '//p[text()="Rok budowy"]/following-sibling::*[last()]//text()'
-        ).get(),
-        has_elevator=main_content.xpath(
-            '//p[text()="Winda"]/following-sibling::*[last()]//text()'
-        ).get(),
-        building_type_detail=main_content.xpath(
-            '//p[text()="Rodzaj zabudowy"]/following-sibling::*[last()]//text()'
-        ).get(),
-        material=main_content.xpath(
-            '//p[text()="Materiał budynku"]/following-sibling::*[last()]//text()'
-        ).get(),
-        window_type=main_content.xpath(
-            '//p[text()="Okna"]/following-sibling::*[last()]//text()'
-        ).get(),
-        security=main_content.xpath(
-            '//p[text()="Bezpieczeństwo"]/following-sibling::*[last()]//text()'
-        ).get(),
-        safety_features=", ".join(
-            main_content.xpath(
-                '//p[text()="Zabezpieczenia"]/following-sibling::*[last()]//span/text()'
-            ).getall()
-        ),
-        media=", ".join(
-            main_content.xpath(
-                '//p[text()="Media"]/following-sibling::*[last()]//span/text()'
-            ).getall()
-        ),
-        description=main_content.xpath(
-            '//div[@data-sentry-element="DescriptionWrapper"]'
-        ).get(),
-        source="otodom",
-        url=sel.xpath('//link[@rel="canonical"]/@href').get(),
+        id=get_safe_nested(ad, ["id"], ""),
+        title=get_safe_nested(ad, ["title"], ""),
+        features=",".join(get_safe_nested(ad, ["features"], [])),
+        description=html.unescape(get_safe_nested(ad, ["description"], "")),
+        url=get_safe_nested(ad, ["url"], None),
+        latitude=get_safe_nested(coordinates, ["latitude"], None),
+        longitude=get_safe_nested(coordinates, ["longitude"], None),
+        province=get_safe_nested(address, ["province", "name"], None),
+        city=get_safe_nested(address, ["city", "name"], None),
+        subregion=get_safe_nested(address, ["county", "name"], None),
+        district=get_safe_nested(address, ["district", "name"], None),
+        street=get_safe_nested(address, ["street", "name"], None),
+
+        offer_type=get_safe_nested(ad, ["adCategory", "type"], None),
+
+        price = get_safe_nested(characteristics, ["price", "value"], 0),
+        size = get_safe_nested(characteristics, ["m", "value"], 0),
+        rooms = get_safe_nested(characteristics, ["rooms_num", "value"], None),
+        market_type=get_safe_nested(characteristics, ["market", "value"], None),
+        building_type=get_safe_nested(characteristics, ["building_type", "value"], None),
+        floor_number=get_safe_nested(characteristics, ["floor_no", "value"], None),
+        building_floors_num=get_safe_nested(characteristics, ["building_floors_num", "value"], None),
+        material=get_safe_nested(characteristics, ["building_material", "value"], None),
+        window_type=get_safe_nested(characteristics, ["windows_type", "value"], None),
+        heating=get_safe_nested(characteristics, ["heating", "value"], ""),
+        year_built=get_safe_nested(characteristics, ["build_year", "value"], None),
+        rent=get_safe_nested(characteristics, ["rent", "value"], None),
+        ownership=get_safe_nested(characteristics, ["building_ownership", "value"], None),
+        construction_status=get_safe_nested(characteristics, ["construction_status", "value"], None),
     )
+
+    
+    # logger.info(f"Json data: {offer}")
     return offer
 
 
@@ -105,7 +139,7 @@ async def parse_file(file_path: Path) -> None:
 
 def parse():
     files_in_dir = os.listdir(SCRAPED_DATA_DIR)
-    files = [file for file in files_in_dir if file.endswith(".html")][:1000]
+    files = [file for file in files_in_dir if file.endswith(".html")]
 
     filepaths_to_parse: list[Path] = [
         Path(os.path.join(SCRAPED_DATA_DIR, file)) for file in files
