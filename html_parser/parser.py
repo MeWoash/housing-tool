@@ -14,9 +14,10 @@ async def parse_file(file_path: Path) -> None:
     content = await read_file(file_path)
 
     offer_id = get_offer_id_from_path(file_path)
+    offer_id_prefix = offer_id[:3]
 
     offer = None
-    match offer_id[:3]:
+    match offer_id_prefix:
         case "OTO":
             offer= await OTO_parse_offer(content)
         case _:
@@ -24,7 +25,7 @@ async def parse_file(file_path: Path) -> None:
             return
     
     if offer:
-        logger.info("Push to DB")
+        logger.info(f"Push to DB {offer_id}: {offer}")
 
 
 def parse():

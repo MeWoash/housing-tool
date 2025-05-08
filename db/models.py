@@ -2,32 +2,31 @@ from sqlmodel import SQLModel, Field
 
 class Offer(SQLModel, table=True):
     id: str = Field(primary_key=True)
-    price: int
-    size: int
-    title: str | None = None
-    rooms: int | None = None
-    year_built: int | None = None
-    heating: str | None = None
-    building_type: str | None = None
-    material: str | None = None
-    rent: int | None = None
-    ownership: str | None = None
-    features: str | None = None
-    floor_number: int | None = None
-    market_type: str | None = None
-    offer_type: str | None = None
-    window_type: str | None = None
-    description: str | None = None
-    url: str | None = None
-    latitude: float | None = None
-    longitude: float | None = None
-    province: str | None = None
-    city: str | None = None
-    subregion: str | None = None
-    building_floors_num: int | None = None
-    construction_status: str | None = None
-    district: str | None = None
-    street: str | None = None
+    price: float | None
+    size: float | None
+    title: str | None
+    rooms: int | None
+    year_built: int | None
+    heating: str | None
+    building_type: str | None
+    material: str | None
+    rent: float | None
+    ownership: str | None
+    features: str | None
+    floor_number: int | None
+    market_type: str | None
+    window_type: str | None
+    description: str | None
+    latitude: float | None
+    longitude: float | None
+    province: str | None
+    city: str | None
+    subregion: str | None
+    building_floors_num: int | None
+    construction_status: str | None
+    district: str | None
+    street: str | None
+    url: str | None
 
     def __str__(self) -> str:
-        return f"Offer(id={self.id}, title={self.title}, price={self.price}, size={self.size}, url={self.url})"
+        return f"Offer(id={self.id}, price={self.price}, size={self.size}, title={self.title}, url={self.url})"
