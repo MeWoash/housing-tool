@@ -1,4 +1,4 @@
-name: Static code analysis
+name: Basic tests
 
 on:
   pull_request:
@@ -32,5 +32,5 @@ jobs:
         run: uv run pyright .
 
       - name: Run Pytest
-        run: uv run pytest
+        run: uv run pytest .
         
