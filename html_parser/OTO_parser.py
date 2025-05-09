@@ -1,9 +1,9 @@
+import html
 import json
 from typing import List, Union
 
 from loguru import logger
 import msgspec
-from parsel import Selector
 from common.classes import DocContent, Url
 from common.utils import get_offer_id_from_url
 from db.models import Offer
@@ -16,20 +16,38 @@ JsonType = Union[None, int, str, bool, List['JsonType'], dict[str, 'JsonType']]
 def extract_characteristics(characteristics: list[CharacteristicElement]) -> dict[str, str]:
     return {c.key: c.value for c in characteristics}
 
-def strip_html_tags(text: str) -> str:
-    text = re.sub(r"<[^>]+>", "", text)
-    text = re.sub(r"(\\r\\n|\\n|\\r)+", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
+def clean_html(text: str) -> str:
+    # first decode any \uXXXX sequences into real characters
+    try:
+        text = text.encode('utf-8', 'ignore').decode('unicode_escape')
+    except Exception:
+        pass
+
+    # unescape HTML entities (&amp;, &lt;, etc.)
+    text = html.unescape(text)
+
+    # fix mojibake: re‐interpret as latin1→utf-8
+    try:
+        text = text.encode('latin-1').decode('utf-8')
+    except Exception:
+        pass
+
+    # strip tags
+    text = re.sub(r"<[^>]+>", " ", text)
+    # collapse whitespace
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
 
 def convert_msgspec_to_db_model(json_obj: Ad) -> Offer | None:
     """Convert a msgspec object to a database model."""
     characteristics_dict= extract_characteristics(json_obj.characteristics)
 
     
-    floor_no_str = characteristics_dict.get("floor_no", "-1")
-    floor_match = re.search(r'\d+', floor_no_str)
-    floor_number = int(floor_match.group()) if floor_match else None
+    floor_number = None
+    floor_no_str = characteristics_dict.get("floor_no", None)
+    if floor_no_str:
+        floor_match = re.search(r'\d+', floor_no_str)
+        floor_number = int(floor_match.group()) if floor_match else None
 
     id = get_offer_id_from_url("OTO", Url(json_obj.url))
     if id is False:
@@ -40,26 +58,25 @@ def convert_msgspec_to_db_model(json_obj: Ad) -> Offer | None:
     construction_status = characteristics_dict.get("construction_status", None)
     price = float(characteristics_dict.get("price", 0) or 0) or None
     size = float(characteristics_dict.get("m", 0)) or None
-    rooms = int(characteristics_dict.get("rooms", 0)) or None
-    year_built = int(characteristics_dict.get("year_built", 0)) or None
+    rooms = int(characteristics_dict.get("rooms_num", 0)) or None
+    year_built = int(characteristics_dict.get("build_year", 0)) or None
     heating = characteristics_dict.get("heating", None)
     building_type = characteristics_dict.get("building_type", None)
     material = characteristics_dict.get("material", None)
     rent = float(characteristics_dict.get("rent", 0)) or None
-    ownership = characteristics_dict.get("ownership", None)
-    floor_number = floor_number
-    market_type = characteristics_dict.get("market_type", "")
-    window_type = characteristics_dict.get("window_type", "")
+    ownership = characteristics_dict.get("building_ownership", None)
+    market_type = characteristics_dict.get("market", None)
+    window_type = characteristics_dict.get("windows_type", None)
     title = json_obj.title or None
-    features = "".join(json_obj.features or []) or None
-    description = strip_html_tags(json_obj.description) if json_obj.description else None
+    features = ",".join(json_obj.features or []) or None
+    description = clean_html(json_obj.description) if json_obj.description else None
     url = json_obj.url
 
     latitude = None
     longitude = None
     if json_obj.location.coordinates:
         latitude = json_obj.location.coordinates.latitude
-        longitude = json_obj.location.coordinates.latitude
+        longitude = json_obj.location.coordinates.longitude
 
     address = json_obj.location.address
     province = None
@@ -146,19 +163,12 @@ async def extract_json_with_key(text: str, key: str) -> str | None:
     return None
 
 async def OTO_parse_offer(content: DocContent) -> Offer | None:
-    sel = Selector(text=content)
-    canonical: str | None = sel.xpath('//link[@rel="canonical"]/@href').get()
-    offer_id: str | None = get_offer_id_from_url("OTO", Url(canonical))
-
-    if not offer_id:
-        logger.warning(f"Offer ID not found in {canonical}.")
-        return None
 
     key_to_search = '"ad":{'
     json_string = await extract_json_with_key(content, key_to_search)
     
     if json_string is None:
-        logger.warning(f"JSON object with tag `{key_to_search}` not found in {canonical}.")
+        logger.warning(f"JSON object with tag `{key_to_search}` not found in {content}.")
         return None
 
     try:

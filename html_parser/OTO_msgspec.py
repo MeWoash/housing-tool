@@ -22,7 +22,7 @@ class Location(msgspec.Struct):
     coordinates: Coordinates | None = None
     address: Address | None = None
 # price, size, rooms, market_type, building_type, floor_number, building_floors_num, material, window_type, heating, year_built, rent, ownership, construction_status
-class CharacteristicElement(msgspec.Struct, frozen = True):
+class CharacteristicElement(msgspec.Struct):
     key: str
     value: str
     label: str | None = None
@@ -32,7 +32,7 @@ class CharacteristicElement(msgspec.Struct, frozen = True):
     typename: str | None = msgspec.field(name="__typename", default=None)
 
 
-class Ad(msgspec.Struct, frozen = True):
+class Ad(msgspec.Struct):
     url: str
     title: str
     location: Location
