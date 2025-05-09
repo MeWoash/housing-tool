@@ -19,7 +19,6 @@ class BaseScrapper:
     """
     Base class for web scrapers.
     """
-    HTTPX_CLIENT = httpx.AsyncClient()
     
     def __init__(
         self,
@@ -44,6 +43,9 @@ class BaseScrapper:
 
         self.urls_filter_funcition = urls_filter_function
         self.id_generator_function = id_generator_function
+
+        self.HTTPX_CLIENT = httpx.AsyncClient()
+
     
     async def generate_pagination_url(self, page_number: int) -> Url:
         return Url(self.web_base_url + self.web_pagination_url.format(page_number=page_number))
@@ -75,15 +77,13 @@ class BaseScrapper:
         headers = get_headers()
         try:
             logger.info(f"Downloading {url}...")
-            response = await BaseScrapper.HTTPX_CLIENT.get(url, headers=headers)
+            response = await self.HTTPX_CLIENT.get(url, headers=headers)
+            self.last_request_timestamp = time.time()
             _ = response.raise_for_status()
         except httpx.HTTPStatusError as e:
             logger.error(f"HTTP error occurred: {e}")
             return None
-        finally:
-            # record the time of this request
-            self.last_request_timestamp = time.time()
-
+            
         return DocContent(response.text)
     
     async def generate_page_path(self, url: Url) -> Path | None:

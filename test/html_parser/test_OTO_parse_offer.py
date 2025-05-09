@@ -2,7 +2,7 @@ from typing import ContextManager, Any, Tuple
 import pytest
 from common.classes import DocContent
 from db.models import Offer
-from html_parser.OTO_parser import OTO_parse_offer
+from html_parser.web1_parser import OTO_parse_offer
 from test_OTO_data import OTO_VALID_JSON, OTO_NONE_JSON, OTO_NO_URL_JSON
 from contextlib import nullcontext
 

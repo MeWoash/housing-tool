@@ -3,7 +3,7 @@ import os
 from loguru import logger
 
 from html_parser.env import BATCH_SIZE, POOL, SCRAPED_DATA_DIR
-from html_parser.OTO_parser import OTO_parse_offer
+from html_parser.web1_parser import OTO_parse_offer
 from common.utils import get_offer_id_from_path, read_file
 from common.fast_process import fast_multi_process
 

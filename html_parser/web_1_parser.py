@@ -7,7 +7,7 @@ import msgspec
 from common.classes import DocContent, Url
 from common.utils import get_offer_id_from_url
 from db.models import Offer
-from html_parser.OTO_msgspec import Ad, CharacteristicElement
+from html_parser.web_1_msgspec import Ad, CharacteristicElement
 import re
 
 JsonType = Union[None, int, str, bool, List['JsonType'], dict[str, 'JsonType']]
