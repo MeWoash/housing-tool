@@ -11,3 +11,5 @@ wheels/
 scraped_data/**
 data/**
 .vscode/**
+.ruff_cache/
+.pytest_cache/

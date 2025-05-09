@@ -30,3 +30,6 @@ class Offer(SQLModel, table=True):
 
     def __str__(self) -> str:
         return f"Offer(id={self.id}, price={self.price}, size={self.size}, title={self.title}, url={self.url})"
+
+    def __repr__(self) -> str:
+        return f"Offer(id={self.id}, price={self.price}, size={self.size}, title={self.title}, url={self.url})"
