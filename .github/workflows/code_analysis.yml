@@ -30,3 +30,7 @@ jobs:
 
       - name: Run Pyright (type check)
         run: uv run pyright .
+
+      - name: Run Pytest
+        run: uv run pytest
+        
