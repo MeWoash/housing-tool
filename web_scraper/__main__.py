@@ -1,7 +1,7 @@
 import asyncio
-from web_scraper.scraper import scrape
+from web_scraper.scrape import run_scrapers
 
 async def web_scraper_main():
-    await scrape()
+    await run_scrapers()
 
 asyncio.run(web_scraper_main())
