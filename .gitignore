@@ -14,5 +14,5 @@ data/**
 .ruff_cache/
 .pytest_cache/
 
-# **/.env
-# **/env.py
+**/.env
+**/env.py
