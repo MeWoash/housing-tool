@@ -1,0 +1,31 @@
+[project]
+name = "housing-tool"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "aiofiles>=24.1.0",
+    "alembic>=1.15.2",
+    "dotenv>=0.9.9",
+    "httpx>=0.28.1",
+    "loguru>=0.7.3",
+    "more-itertools>=10.7.0",
+    "msgspec>=0.19.0",
+    "parsel>=1.10.0",
+    "psycopg2>=2.9.10",
+    "psycopg2-binary>=2.9.10",
+    "pydantic>=2.11.4",
+    "pyright>=1.1.400",
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.26.0",
+    "random-user-agent>=1.0.1",
+    "requests>=2.32.3",
+    "sqlmodel>=0.0.24",
+    "uvicorn>=0.34.2",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.11.8",
+]
